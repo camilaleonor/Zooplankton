@@ -1,0 +1,112 @@
+### Código no R para análise NDMS utilizando  dissimilaridade de Bray Curtis ###
+
+# Análise nmds SELECIONANDO AS SPP COM AR>3% p.ex
+
+rm(list=ls())
+
+setwd("C:/Users/SSD/Desktop/MESTRADO2/Dados e Análises/ANÁLISES ESTATÍSTICAS/Camila/mais testes")
+
+dados1 <- read.csv("teste1.csv", sep = ";")
+
+conjunto <- c("Metridia sp.", "Metridia longa", "Metridia gerlachei", "Euphausiacea n.i.", "Chaethognatha n.i.",
+              "Appendicularia n.i.", "Oikopleura spp.", "Salpidae n.i.")
+
+dados <- dados1 %>%
+  filter(Taxa %in% conjunto)
+
+dados_pivot<-dados%>%select(!c(n_segmento,Latitude, Longitude,Grupo.Taxonomico,PCI))%>%pivot_wider(names_from = Taxa, values_from = Densidade, values_fn = log1p)%>%replace(is.na(.),0)
+dados_pivot2 <- dados_pivot%>%select(!c(CPR, sitio, Chlo, Temperatura, Salinidade))
+comunidade<-dados_pivot%>%ungroup()%>%select(c(6:13))
+ambientais <- dados_pivot[,3:5]
+sitio.f <- as.factor(dados_pivot$sitio)
+CPR.f <- as.factor(dados_pivot$CPR)
+matriz_bio <- vegdist(comunidade,method = "bray")
+matriz_amb <- vegdist(ambientais, method = "bray")
+
+
+
+# PERMANOVA
+
+permanova_sitio <- adonis2(matriz_bio~sitio.f, permutate = 999)
+permanova_sitio
+
+permanova_CPR <- adonis2(matriz_bio~CPR.f, permutate = 999)
+permanova_CPR
+
+
+# nmds 
+
+nmds <- metaMDS(comunidade,distance ='bray')
+nmds
+plot(nmds)
+
+nmds$stress
+
+# NMDS dos dados abióticos (temperatura, salinidade, clorofila)
+
+nmds_ambiental <- metaMDS(ambientais, distance = 'bray')
+plot(nmds, type = "n")
+points(nmds)
+arrows(0, 0, vector_coords_ampliado[, 1], vector_coords_ampliado[, 2], length = 0.2, angle = 20, col = "black", lwd = 2)
+text(vector_coords[, 1], vector_coords[, 2], labels = colnames(ambientais), pos = 4, col = "black", lwd = 2)
+points(vector_bio[, 1], vector_bio[, 2], col = "darkgreen", pch = 17, cex = 0.8)
+text(vector_bio[, 1], vector_bio[, 2], labels = colnames(comunidade), pos = 4, col = "darkgreen", cex = 0.6)
+
+
+vector_coords <- scores(nmds_ambiental, display = "species") # Calcule as coordenadas dos vetores dos dados abióticos no espaço NMDS
+vector_coords_ampliado <- vector_coords * 2  # Multiplique por um fator maior para ampliar as setas
+
+vector_bio <- scores(nmds,display = "species")
+
+# plot nmds só com ambientais
+plot(nmds, type = "n")
+points(nmds, col = "blue", pch = 16, cex = 1)
+arrows(0, 0, vector_coords_ampliado[, 1], vector_coords_ampliado[, 2], length = 0.2, angle = 20, col = "black", lwd = 2)
+text(vector_coords[, 1], vector_coords[, 2], labels = colnames(ambientais), pos = 4, col = "black", lwd = 2)
+
+
+# nmds por sítios, bransfield e gerlache
+
+levels(sitio.f)
+cores_sitio<-c("red", "blue")
+
+plot(nmds, type = "n")
+points(nmds, col = cores_sitio[sitio.f], pch = 16, cex = 0.8)
+#ordihull(nmds, groups = sitio.f, col = cores_sitio, lty = 15)
+ordispider(nmds, groups = sitio.f, col = cores_sitio, lwd = 0.2)
+legend('bottomleft',
+       legend=c("Bransfield", "Gerlache"), 
+       col = c("red", "blue"), pch = 16, cex = 1)
+abline(h=0); abline(v=0)
+points(vector_bio[, 1], vector_bio[, 2], col = "black", pch = 17, cex = 1.2)
+text(vector_bio[, 1], vector_bio[, 2], labels = colnames(comunidade), pos = 4, col = "black", cex = 1)
+arrows(0, 0, vector_coords_ampliado[, 1], vector_coords_ampliado[, 2], length = 0.2, angle = 20, col = "black", lwd = 2)
+text(vector_coords[, 1], vector_coords[, 2], labels = colnames(ambientais), pos = 4, col = "black", lwd = 2)
+
+# nmds por anos, 2016 e 2017
+
+levels(CPR.f)
+cores_CPR<-c("dodgerblue4", "#E75480")
+
+plot(nmds, type="n")
+points(nmds, col=cores_CPR[CPR.f], pch=16, cex = 0.8)
+ordihull(nmds, groups=CPR.f, col=cores_CPR, lty=1)
+#ordispider(nmds, groups = CPR.f, col = cores_CPR)
+legend('bottomleft',
+       legend=c("2017", "2016"), 
+       col = c("#e75480", "dodgerblue4"), pch = 16,cex=1)
+abline(h=0); abline(v=0)
+points(vector_bio[, 1], vector_bio[, 2], col = "black", pch = 17, cex = 1)
+text(vector_bio[, 1], vector_bio[, 2], labels = colnames(comunidade), pos = 4, col = "black", cex = 0.8)
+arrows(0, 0, vector_coords_ampliado[, 1], vector_coords_ampliado[, 2], length = 0.2, angle = 20, col = "red", lwd = 2)
+text(vector_coords[, 1], vector_coords[, 2], labels = colnames(ambientais), pos = 4, col = "red", lwd = 2)
+
+
+
+#### analise SIMPER 
+
+simper_sitio2 <- simper(comunidade, sitio.f)
+print(simper_sitio2)
+
+simper_cpr2 <- simper(comunidade, CPR.f)
+print(simper_cpr2)
