@@ -1,0 +1,210 @@
+############################################################################
+############################################################################
+############################################################################
+
+### TESTES ANOVA (ex: noite/dia)
+
+#carregar dados em xlsx
+dados <- read_excel("dados_primer34.xlsx")
+
+#definindo os fatores que serão utilizados
+periodo.f <- as.factor(dados$periodo)
+subsitio.f <- as.factor(dados$subsitio)
+sitio.f <- as.factor(dados$sitio)
+
+comunidade <- dados[,5:33]
+
+comunidade$periodo <- periodo.f
+
+ab <- dados$abundancia
+
+anova <- aov(ab ~ periodo, data = dados)
+sum_anova <- summary(anova)
+sum_anova
+
+# testando por espécies
+
+modelo_anova <- aov(spp6~periodo, data = comunidade)
+sum_anova <- summary(modelo_anova)
+sum_anova
+
+############################################################################
+############################################################################
+############################################################################
+
+### Testes PERMANOVA
+
+
+#carregar dados em xlsx
+dados <- read_excel("dados_primer34.xlsx")
+
+#definindo os fatores que serão utilizados
+periodo.f <- as.factor(dados$periodo)
+subsitio.f <- as.factor(dados$subsitio)
+sitio.f <- as.factor(dados$sitio)
+
+comunidade <- dados[,5:33]
+
+comunidade$periodo <- periodo.f
+
+ab <- dados$abundancia
+
+# PERMANOVA entre sitios e subsitios
+
+dist_matrix <- vegdist(comunidade, method = "bray")
+
+#utilizando matriz de similaridade!!!
+
+similaridade_matrix <- 1 - proxy::simil(comunidade, method = "bray")
+
+permanova_result <- adonis2(similaridade_matrix ~ sitio.f, data = dados)
+permanova_result
+
+
+############################################################################
+############################################################################
+############################################################################
+
+### Análise de Correlação de Pearson com dados ambientais e espécies
+
+### correlacionando variavel ambiental para comunidade
+
+#carregar dados em xls
+dados <- read_excel("pearson2.xlsx")
+
+attach(dados)
+
+plot_cor(chlo_insitu,abundancia,
+         method = "pearson",
+         ylab = "y",
+         xlab = "x",
+         theme = theme_classic(),
+         pointsize = 2,
+         shape = 20,
+         fill = "black",
+         color = "black",
+         axis.size = 12,
+         ic = TRUE,
+         title = "clorofila CPR-35")
+
+# DEFININDO LIMITES (exemplos)
+
+limite_salinidade <- c(33, 35)
+limite_temperatura <- c(-1, 3)
+limite_clorofila <- c(0,1.5)
+limite_abundancia <- c(0, 35000)
+
+# Ajustar os limites dos eixos antes de chamar a função plot_cor
+
+dados_filtrados <- dados[dados$salinidade >= 33 & dados$salinidade <= 35 &
+                           dados$abundancia >= 0 & dados$abundancia <= 25000, ]
+
+dados_filtrados <- dados[dados$temperatura >= -1 & dados$temperatura <= 3 &
+                           dados$abundancia >= 0 & dados$abundancia <= 25000, ]
+
+dados_filtrados <- dados[dados$clorofila >= 0 & dados$clorofila <= 1.5 &
+                           dados$abundancia >= 0 & dados$abundancia <= 25000, ]
+
+# Plotar o gráfico ajustado
+
+plot_cor(dados_filtrados$clorofila, dados_filtrados$abundancia,
+         method = "pearson",
+         ylab = "abundancia",
+         xlab = "clorofila",
+         theme = theme_classic(),
+         pointsize = 2,
+         shape = 20,
+         fill = "black",
+         color = "black",
+         axis.size = 12,
+         ic = TRUE,
+         title = "clorofila CPR-35")
+
+
+### correlacionando variavel ambiental para cada espécie
+
+#carregar dados em xlsx
+dados <- read_excel("SQRT2_pearson_34.xlsx")
+
+# correlação simples
+
+cor(dados$temperatura,dados$spp4)
+
+cor(dados$salinidade,dados$spp4)
+
+cor(dados$clorofila,dados$spp4)
+
+correlation_test <- cor.test(dados$clorofila, dados$spp27, method = "pearson")
+
+p_value <- correlation_test$p.value
+
+print(p_value)
+
+
+############################################################################
+############################################################################
+############################################################################
+
+### Analise de Correspondência Canônica com variáveis ambientais
+
+#carregar dados em csv
+
+dados <- read.csv("CCA_ambientaisk.csv", sep = ";")
+
+#criar conjunto com as espécies que vou utilizar na análise
+
+conjunto <- c("Metridia sp.", "Metridia longa", "Metridia gerlachei", "Euphausiacea n.i.", "Chaethognatha n.i.",
+              "Appendicularia n.i.", "Oikopleura spp.", "Salpidae n.i.")
+
+dados_subconjunto <- dados %>%
+  filter(Taxa %in% conjunto)
+
+dados_pivot <- dados_subconjunto %>%
+  select(!c(n_segmento, Grupo.Taxonomico)) %>%
+  pivot_wider(names_from = Taxa, values_from = Densidade, values_fn = sqrt) %>%
+  replace(is.na(.), 0)
+
+spe <- dados_pivot %>%
+  ungroup() %>%
+  select(c(10:17)) # apenas os dados da comunidade
+
+ambientais <- dados_pivot[, 5:9] # apenas variáveis ambientais
+
+temperatura <- dados_pivot$Temperatura # definindo temperatura
+salinidade <- dados_pivot$Salinidade # definindo salinidade
+chlo_satelite <- dados_pivot$Chlo_sat # definindo clorofila
+pci_i <- dados_pivot$PCI #definindo pci
+chlo_insitu <- dados_pivot$Chlo_in #definindo dados clorofila insitu
+
+Temperatura <- decostand(temperatura, method="standardize")
+Salinidade <- decostand(salinidade, method="standardize")
+Chl_sat <- decostand(chlo_satelite, method="standardize")
+PCI__ <- decostand(pci_i, method="standardize")
+Chl_insitu <- decostand(chlo_insitu, method="standardize")
+
+dca_result <- decorana(spe)
+dca_result 
+
+plot(dca_result)
+
+ccamodel <- cca(spe~Temperatura + Salinidade + Chl_insitu)
+ccamodel
+summary(ccamodel)
+vif.cca(ccamodel)
+plot(ccamodel)
+
+#plot(ccamodel, display=c("wa")) # apenas os scores dos locais
+
+plot(ccamodel, display=c("wa","cn")) # scores dos locais e centroide das vari?veis ambientais
+
+plot(ccamodel, display=c("sp","cn")) # apenas os scores das esp?cies
+
+plot(ccamodel, display=c("sp","cn")) # scores das esp?cies e centroide das vari?veis ambientais
+
+plot(ccamodel, display=c("wa"),type="n") 
+
+text(ccamodel,display=c("cn"))
+
+############################################################################
+############################################################################
+############################################################################
